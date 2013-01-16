@@ -75,13 +75,5 @@ module Genotide
 
     end
 
-
-    # td = BroadcastTimeDimension.new
-    # 
-    # (Date.new(2011,1,1)..Date.new(2011,5,1)).each do |date|
-    #   # puts date
-    #   td.add(date)
-    # end
-
   end
 end

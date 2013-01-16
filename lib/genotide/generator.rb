@@ -2,72 +2,82 @@ module Genotide
 
   class Piece
 
+    include Enumerable
+
     attr_accessor :pieces, :accepts, :subscribtion
 
     def initialize(options={})
       @accepts = options[:accepts]
       @pieces = []
-      # @subscribtion = ActiveSupport::Notifications.subscribe("#{accepts}_full") do |*args|
-      #   puts "#{accepts} is full"
-      #   child = get(accepts, :last)
-      #   while (child.respond_to?(:accepts) && !child.accepts.nil?) do
-      #     child.unsubscribe
-      #     child = child.get(child.accepts, :last)
-      #   end
-      # 
-      #   event = ActiveSupport::Notifications::Event.new(*args)
-      # 
-      #   piece = event.payload[:piece]
-      #   binding.pry if Date.new(2011, 5, 30) == piece
-      #   if !is_full?(piece)
-      #     add_sub_piece.add(piece)
-      #   else
-      #     ActiveSupport::Notifications.instrument("#{self.class}_full", {:piece => piece})
-      #   end
-      # end
+      @cache = {}
     end
 
-    def unsubscribe
-      ActiveSupport::Notifications.unsubscribe(@subscribtion)
+    def each
+      pieces.each do |item|
+        yield item
+      end
     end
 
-    def max_number_of_pieces
-      fail "implement in subclass"
+    def [](i)
+      pieces[i]
     end
 
     def is_full?(piece)
-      return false if max_number_of_pieces().nil?
-      pieces.count == max_number_of_pieces() && pieces.
+      fail "implement in subclass"
     end
 
     def add(piece)
-      # if piece.class == accepts
-      #   
-      # else
-      #   
-      # end
+      return :full if is_full?(piece)
+      if accepts == nil
+        pieces.push(piece)
+      else
+        add_sub_piece if pieces.empty?
+        result = pieces.last.add(piece)
+        if result == :full
+          add_sub_piece
+          pieces.last.add(piece)
+        end
+      end
     end
 
     def add_sub_piece
-      puts "----- adding #{accepts} ------"
+      # puts "----- adding #{accepts} ------"
       new_piece = accepts.send(:new)
       pieces << new_piece
-      pieces.last
+      # pieces.last
     end
 
-    def get_level(klass)
-      if self.class == klass
+    def get_all(klass, should_wrap=true)
+      result = if self.class == klass
         [self]
       else
         pieces.reduce([]) do |memo, piece|
-          if piece.respond_to? :get_level
-            memo.concat(piece.get_level(klass))
+          if piece.respond_to? :get_all
+            memo.concat(piece.get_all(klass, false))
           else
             memo.push(piece)
           end
           memo
         end
       end
+      if should_wrap
+        p = Piece.new
+        p.accepts = klass
+        p.pieces = result
+        p
+      else
+        result
+      end
+    end
+
+    def index(piece)
+        klass = piece.class
+        if @cache.has_key?(klass)
+          @cache[klass]
+        else
+          @cache[klass] = get_all(klass)
+        end
+        result = @cache[klass].pieces.index(piece) + 1
     end
 
     def get(klass, selector)
@@ -94,6 +104,20 @@ module Genotide
       first = get_first(Date)
       last  = get_last(Date)
       "#{first} - #{last} -- #{last - first + 1}"
+    end
+
+    def get_chain
+      if accepts.nil?
+        []
+      else
+        [accepts].concat(pieces.last.get_chain)
+      end
+    end
+
+    def display
+      chain = get_chain
+      lowest = chain.last
+      get_all(lowest)
     end
 
   end
